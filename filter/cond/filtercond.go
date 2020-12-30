@@ -137,34 +137,42 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 }
 
 // Event the main filter event
-func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (logevent.LogEvent, bool) {
+func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+	eventsOut := make([]logevent.LogEvent, 0)
 	if f.expression != nil {
 		ep := EventParameters{Event: &event}
 		ret, err := f.expression.Eval(&ep)
 		if err != nil {
 			goglog.Logger.Error(err)
 			event.AddTag(ErrorTag)
-			return event, false
+			eventsOut = append(eventsOut, event)
+			return eventsOut, false
 		}
 		if r, ok := ret.(bool); ok {
 			if r {
 				for _, filter := range f.filters {
-					event, ok = filter.Event(ctx, event)
+					eventsOut, ok = filter.Event(ctx, event)
 					if ok {
-						event = filter.CommonFilter(ctx, event)
+						for _, evt := range eventsOut {
+							evt = filter.CommonFilter(ctx, evt)
+						}
 					}
 				}
 			} else {
 				for _, filter := range f.elseFilters {
-					event, ok = filter.Event(ctx, event)
+					eventsOut, ok = filter.Event(ctx, event)
 					if ok {
-						event = filter.CommonFilter(ctx, event)
+						for _, evt := range eventsOut {
+							evt = filter.CommonFilter(ctx, evt)
+						}
 					}
 				}
 			}
-			return event, true
+			eventsOut = append(eventsOut, event)
+			return eventsOut, true
 		}
 		goglog.Logger.Warn("filter cond condition returns not a boolean, ignored")
 	}
-	return event, false
+	eventsOut = append(eventsOut, event)
+	return eventsOut, false
 }

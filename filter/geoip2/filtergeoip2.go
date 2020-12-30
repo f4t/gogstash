@@ -84,16 +84,19 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 }
 
 // Event the main filter event
-func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (logevent.LogEvent, bool) {
+func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+	eventsOut := make([]logevent.LogEvent, 0)
 	ipstr := event.GetString(f.IPField)
 	if ipstr == "" {
 		// Passthru if empty
-		return event, false
+		eventsOut = append(eventsOut, event)
+		return eventsOut, false
 	}
 	ip := net.ParseIP(ipstr)
 	if f.SkipPrivate && f.privateIP(ip) {
 		// Passthru
-		return event, false
+		eventsOut = append(eventsOut, event)
+		return eventsOut, false
 	}
 	var err error
 	var record *geoip2.City
@@ -107,17 +110,20 @@ func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (loge
 				goglog.Logger.Error(err)
 			}
 			event.AddTag(ErrorTag)
-			return event, false
+			eventsOut = append(eventsOut, event)
+			return eventsOut, false
 		}
 		f.cache.Add(ipstr, record)
 	}
 	if record == nil {
 		event.AddTag(ErrorTag)
-		return event, false
+		eventsOut = append(eventsOut, event)
+		return eventsOut, false
 	}
 	if record.Location.Latitude == 0 && record.Location.Longitude == 0 {
 		event.AddTag(ErrorTag)
-		return event, false
+		eventsOut = append(eventsOut, event)
+		return eventsOut, false
 	}
 
 	if f.FlatFormat {
@@ -172,7 +178,8 @@ func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (loge
 		event.SetValue(f.Key, m)
 	}
 
-	return event, true
+	eventsOut = append(eventsOut, event)
+	return eventsOut, true
 }
 
 func (f *FilterConfig) privateIP(ip net.IP) bool {

@@ -59,7 +59,8 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 }
 
 // Event the main filter event
-func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (logevent.LogEvent, bool) {
+func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+	eventsOut := make([]logevent.LogEvent, 0)
 	if f.Split[0] != "" {
 		event.SetValue(f.Split[0], strings.Split(event.GetString(f.Split[0]), f.Split[1]))
 	}
@@ -75,7 +76,8 @@ func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (loge
 		event.Remove(f.Rename[0])
 	}
 	// always return true here for configured filter
-	return event, true
+	eventsOut = append(eventsOut, event)
+	return eventsOut, true
 }
 
 func mergeField(event logevent.LogEvent, destinationName, source string) logevent.LogEvent {

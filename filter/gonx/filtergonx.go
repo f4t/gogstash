@@ -72,14 +72,16 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 }
 
 // Event the main filter event
-func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (logevent.LogEvent, bool) {
+func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+	eventsOut := make([]logevent.LogEvent, 0)
 	message := event.GetString(f.Source)
 	reader := gonx.NewParserReader(strings.NewReader(message), f.parser)
 	entry, err := reader.Read()
 	if err != nil {
 		event.AddTag(ErrorTag)
 		goglog.Logger.Errorf("%s: %q", err, message)
-		return event, false
+		eventsOut = append(eventsOut, event)
+		return eventsOut, false
 	}
 
 	for _, field := range f.fields {
@@ -87,5 +89,6 @@ func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (loge
 		event.SetValue(field, s)
 	}
 
-	return event, true
+	eventsOut = append(eventsOut, event)
+	return eventsOut, true
 }

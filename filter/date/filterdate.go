@@ -65,7 +65,8 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 }
 
 // Event the main filter event
-func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (logevent.LogEvent, bool) {
+func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+	eventsOut := make([]logevent.LogEvent, 0)
 	var (
 		timestamp time.Time
 		err       error
@@ -95,7 +96,8 @@ func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (loge
 	if err != nil {
 		event.AddTag(ErrorTag)
 		goglog.Logger.Error(err)
-		return event, false
+		eventsOut = append(eventsOut, event)
+		return eventsOut, false
 	}
 	if f.Target == DefaultTarget {
 		event.Timestamp = timestamp.UTC()
@@ -103,7 +105,8 @@ func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (loge
 		event.SetValue(f.Target, timestamp.UTC())
 	}
 
-	return event, true
+	eventsOut = append(eventsOut, event)
+	return eventsOut, true
 }
 
 func convertFloat(value float64) (int64, int64) {

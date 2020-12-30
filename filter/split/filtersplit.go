@@ -1,24 +1,20 @@
-package filterremovefield
+package filteraddfield
 
 import (
 	"context"
 
 	"github.com/tsaikd/gogstash/config"
-	"github.com/tsaikd/gogstash/config/goglog"
 	"github.com/tsaikd/gogstash/config/logevent"
 )
 
 // ModuleName is the name used in config file
-const ModuleName = "remove_field"
+const ModuleName = "split"
 
 // FilterConfig holds the configuration json fields and internal objects
 type FilterConfig struct {
 	config.FilterConfig
-
-	// list all fields to remove
-	Fields []string `json:"fields"`
-	// remove event origin message field, not in extra
-	RemoveMessage bool `json:"remove_message"`
+	Source string `json:"split_source"`
+	// Value string `json:"value"`
 }
 
 // DefaultFilterConfig returns an FilterConfig struct with default values
@@ -29,8 +25,6 @@ func DefaultFilterConfig() FilterConfig {
 				Type: ModuleName,
 			},
 		},
-		Fields:        []string{},
-		RemoveMessage: false,
 	}
 }
 
@@ -41,29 +35,43 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 		return nil, err
 	}
 
-	if len(conf.Fields) < 1 {
-		goglog.Logger.Warn("filter remove_field config empty fields")
+	return &conf, nil
+}
+
+func CloneEvent(event logevent.LogEvent) logevent.LogEvent {
+	evt := logevent.LogEvent{
+		Timestamp: event.Timestamp,
+		Tags:      event.Tags,
+		Message:   event.Message,
+		Extra:     make(map[string]interface{}),
 	}
 
-	return &conf, nil
+	// Copy from the original map to the target map
+	for key, value := range event.Extra {
+		evt.Extra[key] = value
+	}
+
+	return evt
 }
 
 // Event the main filter event
 func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+
 	eventsOut := make([]logevent.LogEvent, 0)
-	if event.Extra == nil {
-		event.Extra = map[string]interface{}{}
+	if _, ok := event.Extra[f.Source]; !ok {
+		eventsOut = append(eventsOut, event)
+		event.AddTag("gogstash_filter_split_error")
+		return eventsOut, false
 	}
 
-	for _, field := range f.Fields {
-		event.Remove(field)
+	splitItems, _ := event.GetValue(f.Source)
+	event.Remove(f.Source)
+
+	for _, elem := range splitItems.([]interface{}) {
+		evt := CloneEvent(event)
+		evt.SetValue(f.Source, elem)
+		eventsOut = append(eventsOut, evt)
 	}
 
-	if f.RemoveMessage {
-		event.Message = ""
-	}
-
-	// TODO: remove unset field return false
-	eventsOut = append(eventsOut, event)
 	return eventsOut, true
 }

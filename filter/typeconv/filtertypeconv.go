@@ -63,7 +63,8 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 }
 
 // Event the main filter event
-func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (logevent.LogEvent, bool) {
+func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+	eventsOut := make([]logevent.LogEvent, 0)
 	for _, field := range f.Fields {
 		if value, ok := event.GetValue(field); ok {
 			switch f.ConvType {
@@ -142,5 +143,6 @@ func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (loge
 	}
 
 	// TODO: no converts return false
-	return event, true
+	eventsOut = append(eventsOut, event)
+	return eventsOut, true
 }

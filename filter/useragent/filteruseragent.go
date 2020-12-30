@@ -108,10 +108,12 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 }
 
 // Event the main filter event
-func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (logevent.LogEvent, bool) {
+func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+	eventsOut := make([]logevent.LogEvent, 0)
 	ua := event.GetString(f.Source)
 	if ua == "" {
-		return event, false
+		eventsOut = append(eventsOut, event)
+		return eventsOut, false
 	}
 	var client *uaparser.Client
 	// single-thread here
@@ -148,5 +150,6 @@ func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (loge
 			event.SetValue(f.fields.Patch, client.UserAgent.Patch)
 		}
 	}
-	return event, true
+	eventsOut = append(eventsOut, event)
+	return eventsOut, true
 }

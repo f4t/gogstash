@@ -16,7 +16,7 @@ var (
 // TypeFilterConfig is interface of filter module
 type TypeFilterConfig interface {
 	TypeCommonConfig
-	Event(context.Context, logevent.LogEvent) (logevent.LogEvent, bool)
+	Event(context.Context, logevent.LogEvent) ([]logevent.LogEvent, bool)
 	CommonFilter(context.Context, logevent.LogEvent) logevent.LogEvent
 }
 
@@ -25,6 +25,7 @@ func (f *FilterConfig) IsConfigured() bool {
 	return len(f.AddTags) != 0 || len(f.AddFields) != 0 || len(f.RemoveTags) != 0 || len(f.RemoveFields) != 0
 }
 
+// CommonFilter applies common inline filters such as add/remove fields/tags
 func (f *FilterConfig) CommonFilter(ctx context.Context, event logevent.LogEvent) logevent.LogEvent {
 
 	event.AddTag(f.AddTags...)
@@ -102,13 +103,26 @@ func (t *Config) startFilters() (err error) {
 				}
 			case event := <-t.chInFilter:
 				var ok bool
+				events := make([]logevent.LogEvent, 0)
+				events = append(events, event)
 				for _, filter := range filters {
-					event, ok = filter.Event(t.ctx, event)
-					if ok {
-						event = filter.CommonFilter(t.ctx, event)
+					eventsOut := make([]logevent.LogEvent, 0)
+					for _, event := range events {
+						var filteredEvents []logevent.LogEvent
+						filteredEvents, ok = filter.Event(t.ctx, event)
+						if ok {
+							for i, evt := range filteredEvents {
+								filteredEvents[i] = filter.CommonFilter(t.ctx, evt)
+							}
+						}
+						eventsOut = append(eventsOut, filteredEvents...)
 					}
+					events = eventsOut
 				}
-				t.chFilterOut <- event
+
+				for _, evt := range events {
+					t.chFilterOut <- evt
+				}
 			}
 		}
 	})

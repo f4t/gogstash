@@ -39,10 +39,14 @@ func InitHandler(ctx context.Context, raw *config.ConfigRaw) (config.TypeFilterC
 }
 
 // Event the main filter event
-func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) (logevent.LogEvent, bool) {
+func (f *FilterConfig) Event(ctx context.Context, event logevent.LogEvent) ([]logevent.LogEvent, bool) {
+	eventsOut := make([]logevent.LogEvent, 0)
 	if _, ok := event.Extra[f.Key]; ok {
-		return event, false
+		eventsOut = append(eventsOut, event)
+		return eventsOut, false
 	}
+
 	event.SetValue(f.Key, event.Format(f.Value))
-	return event, true
+	eventsOut = append(eventsOut, event)
+	return eventsOut, true
 }
